@@ -53,7 +53,7 @@ type valueNode struct {
 	Body string `xml:"chardata"`
 }
 
-func next(p *xml.Decoder) (interface{}, error) {
+func next(p *xml.Decoder) interface{} {
 	se := nextStart(p)
 	switch se.Name.Local {
 	case "string":
@@ -61,7 +61,7 @@ func next(p *xml.Decoder) (interface{}, error) {
 		if e := p.DecodeElement(&s, &se); e != nil {
 			panic (e)
 		}
-		return s, nil
+		return s
 	case "boolean":
 		var s string
 		if e := p.DecodeElement(&s, &se); e != nil {
@@ -77,7 +77,7 @@ func next(p *xml.Decoder) (interface{}, error) {
 		default:
 			panic (errors.New("invalid boolean value"))
 		}
-		return b, nil
+		return b
 	case "int", "i1", "i2", "i4", "i8":
 		var s string
 		var i int
@@ -88,7 +88,7 @@ func next(p *xml.Decoder) (interface{}, error) {
 		if e != nil {
 			panic (e)
 		}
-		return i, nil
+		return i
 	case "double":
 		var s string
 		var f float64
@@ -99,7 +99,7 @@ func next(p *xml.Decoder) (interface{}, error) {
 		if e != nil {
 			panic (e)
 		}
-		return f, nil
+		return f
 	case "dateTime.iso8601":
 		var s string
 		if e := p.DecodeElement(&s, &se); e != nil {
@@ -115,7 +115,7 @@ func next(p *xml.Decoder) (interface{}, error) {
 				}
 			}
 		}
-		return t, nil
+		return t
 	case "base64":
 		var s string
 		if e := p.DecodeElement(&s, &se); e != nil {
@@ -124,7 +124,7 @@ func next(p *xml.Decoder) (interface{}, error) {
 		if b, e := base64.StdEncoding.DecodeString(s); e != nil {
 			panic (e)
 		} else {
-			return b, nil
+			return b
 		}
 	case "member":
 		nextStart(p)
@@ -150,7 +150,7 @@ func next(p *xml.Decoder) (interface{}, error) {
 				panic (e)
 			}
 			se = nextStart(p)
-			value, _ := next(p)
+			value := next(p)
 			if se.Name.Local != "value" {
 				panic (errors.New("invalid response"))
 			}
@@ -160,26 +160,26 @@ func next(p *xml.Decoder) (interface{}, error) {
 			st [name] = value
 			se = nextStart (p)
 		}
-		return st, nil
+		return st
 	case "array":
 		var ar Array
 		nextStart(p) // data
 		for {
 			nextStart(p) // top of value
-			value, _ := next(p)
+			value := next(p)
 			if value == nil {
 				break
 			}
 			ar = append(ar, value)
 		}
-		return ar, nil
+		return ar
 
 	case "":
-		return nil, errors.New("<EOF>")
+		return nil
 	}
 	panic (errors.New ("Invalid token: " + se.Name.Local))
 }
-type s struct { }
+
 func nextStart(p *xml.Decoder) xml.StartElement {
 	for {
 		t, e := p.Token()
@@ -332,16 +332,16 @@ func (client *Client) Call(name string, args ... interface {}) Struct {
 	if se.Name.Local == "params" {
 		nextReq ("param");
 		nextReq ("value");
-		v, e := next(p)
+		v := next(p)
 		if v == nil {
-			panic (e)
+			panic (errors.New ("No value read"))
 		}
 		return v.(Struct)
 	} else if se.Name.Local == "fault" {
 		nextReq ("value");
-		v, e := next(p)
-		if e == nil {
-			panic (e)
+		v := next(p)
+		if v == nil {
+			panic (errors.New ("No value read"))
 		}
 		s := v.(Struct)
 		m := s ["faultString"].(string)
