@@ -35,6 +35,12 @@ var xmlSpecial = map[byte]string{
 	'&':  "&amp;",
 }
 
+func check (e error) {
+	if e != nil {
+		panic (e)
+	}
+}
+
 func xmlEscape(s string) string {
 	var b bytes.Buffer
 	for i := 0; i < len(s); i++ {
@@ -55,19 +61,17 @@ type valueNode struct {
 
 func next(p *xml.Decoder) interface{} {
 	se := nextStart(p)
+	decodeElement := func () string {
+		var s string
+		e := p.DecodeElement(&s, &se) 
+		check (e)
+		return s
+	}
 	switch se.Name.Local {
 	case "string":
-		var s string
-		if e := p.DecodeElement(&s, &se); e != nil {
-			panic (e)
-		}
-		return s
+		return decodeElement ()
 	case "boolean":
-		var s string
-		if e := p.DecodeElement(&s, &se); e != nil {
-			panic (e)
-		}
-		s = strings.TrimSpace(s)
+		s := strings.TrimSpace(decodeElement ())
 		var b bool
 		switch s {
 		case "true","1":
@@ -79,53 +83,28 @@ func next(p *xml.Decoder) interface{} {
 		}
 		return b
 	case "int", "i1", "i2", "i4", "i8":
-		var s string
-		var i int
-		if e := p.DecodeElement(&s, &se); e != nil {
-			panic (e)
-		}
-		i, e := strconv.Atoi(strings.TrimSpace(s))
-		if e != nil {
-			panic (e)
-		}
+		i, e := strconv.Atoi(strings.TrimSpace(decodeElement ()))
+		check (e)
 		return i
 	case "double":
-		var s string
-		var f float64
-		if e := p.DecodeElement(&s, &se); e != nil {
-			panic (e)
-		}
-		f, e := strconv.ParseFloat(strings.TrimSpace(s), 64)
-		if e != nil {
-			panic (e)
-		}
+		f, e := strconv.ParseFloat(strings.TrimSpace(decodeElement ()), 64)
+		check (e)
 		return f
 	case "dateTime.iso8601":
-		var s string
-		if e := p.DecodeElement(&s, &se); e != nil {
-			panic (e)
-		}
+		s := decodeElement ()
 		t, e := time.Parse("20060102T15:04:05", s)
 		if e != nil {
 			t, e = time.Parse("2006-01-02T15:04:05-07:00", s)
 			if e != nil {
 				t, e = time.Parse("2006-01-02T15:04:05", s)
-				if e != nil {
-					panic (e)
-				}
+				check (e)
 			}
 		}
 		return t
 	case "base64":
-		var s string
-		if e := p.DecodeElement(&s, &se); e != nil {
-			panic (e)
-		}
-		if b, e := base64.StdEncoding.DecodeString(s); e != nil {
-			panic (e)
-		} else {
-			return b
-		}
+		b, e := base64.StdEncoding.DecodeString(decodeElement ())
+		check (e)
+		return b
 	case "member":
 		nextStart(p)
 		return next(p)
@@ -145,10 +124,7 @@ func next(p *xml.Decoder) interface{} {
 			if se.Name.Local != "name" {
 				panic (errors.New("invalid response"))
 			}
-			var name string
-			if e := p.DecodeElement(&name, &se); e != nil {
-				panic (e)
-			}
+			name := decodeElement ()
 			se = nextStart(p)
 			value := next(p)
 			if se.Name.Local != "value" {
@@ -334,14 +310,14 @@ func (client *Client) Call(name string, args ... interface {}) Struct {
 		nextReq ("value");
 		v := next(p)
 		if v == nil {
-			panic (errors.New ("No value read"))
+			panic (errors.New ("No result read"))
 		}
 		return v.(Struct)
 	} else if se.Name.Local == "fault" {
 		nextReq ("value");
 		v := next(p)
 		if v == nil {
-			panic (errors.New ("No value read"))
+			panic (errors.New ("No result read"))
 		}
 		s := v.(Struct)
 		m := s ["faultString"].(string)
