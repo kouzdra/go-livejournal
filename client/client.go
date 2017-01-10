@@ -86,7 +86,10 @@ func next(p *xml.Decoder) (interface{}, error) {
 			return nil, e
 		}
 		i, e := strconv.Atoi(strings.TrimSpace(s))
-		return i, e
+		if e != nil {
+			panic (e)
+		}
+		return i, nil
 	case "double":
 		var s string
 		var f float64
@@ -94,7 +97,10 @@ func next(p *xml.Decoder) (interface{}, error) {
 			return nil, e
 		}
 		f, e := strconv.ParseFloat(strings.TrimSpace(s), 64)
-		return f, e
+		if e != nil {
+			panic (e)
+		}
+		return f, nil
 	case "dateTime.iso8601":
 		var s string
 		if e := p.DecodeElement(&s, &se); e != nil {
@@ -105,16 +111,19 @@ func next(p *xml.Decoder) (interface{}, error) {
 			t, e = time.Parse("2006-01-02T15:04:05-07:00", s)
 			if e != nil {
 				t, e = time.Parse("2006-01-02T15:04:05", s)
+				if e != nil {
+					panic (e)
+				}
 			}
 		}
-		return t, e
+		return t, nil
 	case "base64":
 		var s string
 		if e := p.DecodeElement(&s, &se); e != nil {
 			return nil, e
 		}
 		if b, e := base64.StdEncoding.DecodeString(s); e != nil {
-			return nil, e
+			panic (e)
 		} else {
 			return b, nil
 		}
