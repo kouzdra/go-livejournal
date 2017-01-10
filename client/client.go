@@ -13,7 +13,6 @@ import (
 	"strings"
 	"time"
 	"io"
-	"io/ioutil"
 	"encoding/hex"
 	"crypto/md5"
 )
@@ -287,7 +286,7 @@ func to_xml(v interface{}, typ bool) (s string) {
 type Auth struct {
 	Username  string "username"
 	Password  string "password"
-	Hpassword string  "hpassword"
+	Hpassword string "hpassword"
 	Ver          int "ver"
 }
 
@@ -320,39 +319,39 @@ func (client *Client) Call(name string, args ... interface {}) (v interface{}, e
 	bs := bytes.NewBuffer([]byte(s))
 	r, e := http.Post(client.Url, "text/xml", bs)
 	if e != nil {
-		return nil, e
+		panic (&HTTPError {Error:e})
 	}
 	defer r.Body.Close()
 
 	p := xml.NewDecoder(r.Body)
-	se, e := nextStart(p) // methodResponse
-	invResErr := func (id string) error {
-		b, _ := ioutil.ReadAll (r.Body)
-		return errors.New(fmt.Sprintf ("invalid response %s: %s\n", id, b))
-	}
-	if se.Name.Local != "methodResponse" {
-		return nil, invResErr ("methodResponse")
+	nextReq := func (req string) {
+		se, e := nextStart(p) // methodResponse
+		if e != nil {
+			panic (e)
+		}
+		if se.Name.Local != req {
+			panic (&Format {Req: req, Token: se.Name.Local})
+		}
 	}
 
-	se, e = nextStart(p) // params
+	nextReq ("methodResponse");
+	se, e := nextStart(p) // params
 	if se.Name.Local == "params" {
-		se, e = nextStart(p) // param
-		if se.Name.Local != "param" {
-			return nil, invResErr ("param")
-		}
-		se, e = nextStart(p) // value
-		if se.Name.Local != "value" {
-			return nil, invResErr ("value")
-		}
+		nextReq ("param");
+		nextReq ("value");
 		_, v, e = next(p)
 	} else if se.Name.Local == "fault" {
-		se, e = nextStart(p) // value
-		if se.Name.Local != "value" {
-			return nil, invResErr ("fault")
-		}
+		nextReq ("value");
 		_, v, e = next(p)
+		if e != nil {
+			panic (e)
+		}
+		s := v.(Struct)
+		m := s ["faultString"].(string)
+		c := s ["faultCode"].(int)
+		panic (&Fault {Code: c, Message: m})
 	} else {
-		return nil, invResErr (se.Name.Local)
+		panic (&Format {Token: se.Name.Local, Req: "params\" or \"fault"})
 	}
 	return v, e
 }
