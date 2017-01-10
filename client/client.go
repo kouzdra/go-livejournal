@@ -135,7 +135,7 @@ func next(p *xml.Decoder) (interface{}, error) {
 			// name
 			se = nextStart(p)
 			if se.Name.Local != "name" {
-				return nil, errors.New("invalid response")
+				panic (errors.New("invalid response"))
 			}
 			var name string
 			if e := p.DecodeElement(&name, &se); e != nil {
@@ -144,7 +144,7 @@ func next(p *xml.Decoder) (interface{}, error) {
 			se = nextStart(p)
 			value, e := next(p)
 			if se.Name.Local != "value" {
-				return nil, errors.New("invalid response")
+				panic (errors.New("invalid response"))
 			}
 			if e != nil {
 				break
